@@ -1,0 +1,241 @@
+---
+title: "Giannis Antetokounmpo and the Milwaukee Bucks"
+author: "Joey Cipriano"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.align = "center",
+  warning = FALSE,
+  message = FALSE
+)
+library(tidyverse)
+library(here)
+
+# Uncomment and run to install necessary packages 
+# install.packages("devtools")
+# library(devtools)
+# install_github("rtelmore/ballr")
+library(ballr)
+# install.packages("ggthemes")
+library(ggthemes)
+theme_set(theme_economist_white())
+```
+
+```{r import-career, include=FALSE}
+# 8 years * 72 games a year so each row is a game from one of the last 8 seasons
+giannis_career_w_games <- read_csv(here("data", "giannis_career.csv"))
+
+# Break it down into just the year data (8 rows)
+giannis_growth <- giannis_career_w_games %>%
+  select(year:pa_g) %>%
+  select(-link) %>%
+  distinct()
+```
+
+Giannis Antetokounmpo just won his first ever NBA Championship with the Milwaukee Bucks, who haven't won a championship in nearly half a century. In order to celebrate, let's take a deeper dive into his career thus far and the path him and the Bucks took to get to this day. All data sourced from [Basketball-Reference.com](https://www.basketball-reference.com/) and retrieved using their API.
+
+## The Rise of the Bucks
+
+The Bucks were not a pretty mediocre team when they drafted Giannis 15th in the 2013 NBA draft.
+
+```{r east-conf}
+# Only instance of a scrape in the actual Markdown doc, should be ok
+NBAStandingsByDate("2015-04-15")$East %>%
+  
+  # Data is formatted weird where some of the rows specify division, only keep team rows
+  filter(!str_detect(eastern_conference, "Division")) %>%
+  
+  # Prepare these variables to be put into bar chart
+  mutate(
+    w_lpercent = as.double(w_lpercent),
+    eastern_conference = as.factor(eastern_conference)
+  ) %>%
+  
+  # Creat the bar graph, ordered from winningest to least winningest
+  ggplot(mapping = aes(x = fct_reorder(eastern_conference, desc(w_lpercent)), y = w_lpercent)) +
+  geom_col(aes(fill = str_detect(eastern_conference, "Bucks")), show.legend = FALSE) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(
+    x = "",
+    y = "Percent Wins",
+    title = "2014 East Conference End of Season Standings",
+    caption = "Asterisk Indicates Playoff Qualification"
+  ) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+Even though they were the 6th seed, they were bounced in the first round [in 6 games by the Chicago Bulls](https://www.landofbasketball.com/yearbyyear/2014_2015_playoffs_brackets.htm). After Giannis was drafted, things did not necessarily get better right away. In fact, they got much, much worse. In Giannis' rookie year, the Bucks were 18th in the Eastern Conference. But the good thing about Rock BottomTM, is that there's only up to go from there.
+
+```{r team-outcomes}
+giannis_growth %>%
+  select(rank, w_lpercent, year) %>%
+  
+  # Doing this so we are able to facet wrap later and look at the metrics together
+  pivot_longer(c(rank, w_lpercent), names_to = "metric", values_to = "outcome") %>%
+  
+  # Change labels here so the titles look better on the facet wrap
+  mutate(
+    metric = factor(metric,
+      levels = c("rank", "w_lpercent"),
+      labels = c("Rank", "Percent Wins")
+    )
+  ) %>%
+  
+  # Plot the lines and wrap along the pivot variable
+  ggplot(mapping = aes(x = year, y = outcome)) +
+  geom_line(size = 0.8) +
+  facet_wrap(~metric,
+    ncol = 1,
+    scales = "free_y"
+  ) +
+  labs(
+    x = "Year",
+    y = "",
+    title = "Team Outcomes 2014-2021"
+  )  +
+  theme(panel.spacing = unit(1, "lines"),
+        strip.text.x = element_text(face = "bold"),
+        title = element_text(size = 13, vjust = 2))
+```
+
+As you can see, in the 8 years since the Bucks drafter Giannis, the Bucks have gotten consistently better in both end of season standing and win percentage. All of this ultimately culminated in a championship this year! Note: For 2019 and 2020, the bucks have been the team with the most wins at the end of the regular season in the Eastern Conference, making them the favorites to win the Eastern Conference Championship. It took years of getting bounced from the playoffs earlier than expected for them to get the pieces right in order to make it to the end and win it all.
+
+Below, I've charted the change in their average point differential over time. This number represents the average difference in their team's score and their opponents at the end of any given game. This stat is valuable because it not only shows us how much the Bucks have been winning, but just how much have they been winning by.
+
+```{r point-diff}
+giannis_career_w_games %>%
+  
+  # Data uses avg_diff for season up to that point for some reason, looking for final
+  group_by(year) %>%
+  summarize(
+    date = max(date)
+  ) %>%
+  
+  # Now that we have the final avg point diff, add back in the avg_diff data
+  left_join(giannis_career_w_games) %>%
+  select(year, avg_diff) %>%
+  
+  # Plot season avg in point diff over time
+  ggplot(aes(x = year, y = avg_diff)) +
+  geom_line(size = 0.8) +
+  geom_hline(yintercept = 0, color = "blue") +
+  labs(
+    x = "Year",
+    y = "Avg Point Differential",
+    title = "Season Avg Point Differential Over Time"
+  ) +
+  theme(title = element_text(size = 13, vjust = 2),
+        axis.title.y = element_text(vjust = 2.5),
+        axis.title.x = element_text(vjust = -1.5))
+```
+
+Again, we see a steady rise over time. At their peak in 2020, the Bucks were being teams by an average of 10 points a game!
+
+All of that success doesn't come out of nowhere. There is one man who is to blame for the meteoric rise of the Bucks...
+
+## The Rise of Giannis
+
+In terms of career arcs, Giannis has had one of the best in NBA history. He wasn't a star out of the gate like many superstars before him such as Michael Jordan or Shaq (who Giannis has drawn many comparisons to). After being drafted 15th, Giannis didn't even start that many games in his first season, and remember, this was on a team that was so bad they only won 20% of their games. 
+
+```{r games-started}
+giannis_growth %>%
+  
+  # Pivot so we can set this up as a paired bar graph
+  pivot_longer(c(games_played, games_started),
+    names_to = "p_s",
+    values_to = "num"
+  ) %>%
+  
+  # Change to a factor so we can make the labels look better
+  mutate(p_s = factor(p_s, labels = c("Games Played", "Games Started"))) %>%
+  ggplot(mapping = aes(x = year, y = num, fill = p_s)) +
+  geom_bar(
+    position = "dodge",
+    stat = "identity",
+    width = 0.5
+  ) +
+  labs(
+    x = "Year",
+    y = "Number of Games",
+    title = "Games Started vs Played Over Time"
+  ) +
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(),
+    title = element_text(size = 13, vjust = 2),
+    axis.title.y = element_text(vjust = 2.5),
+    axis.title.x = element_text(vjust = -1.5)
+  )
+```
+
+And to Giannis' credit, playing in the NBA was very different than the Greek league that he was used to. On top of that, he was only 19 years old! As he got older and more experienced he would start playing more and more minutes as the team began to lean on him for his sccoring prowess as well as his imposing defense.
+
+```{r playing-time}
+giannis_growth %>%
+  
+  # Calculate minutes per game
+  select(year, mp, games_played) %>%
+  mutate(mpg = mp / games_played) %>%
+  
+  # Plot changes ing mpg over time 
+  ggplot() +
+  geom_line(aes(x = year, mpg), size = 0.8) +
+  labs(
+    x = "Year",
+    y = "Minutes Per Game",
+    title = "Giannis' Playing Time Over the Years"
+  ) +
+  theme(title = element_text(size = 13, vjust = 2),
+        axis.title.y = element_text(vjust = 2.5),
+        axis.title.x = element_text(vjust = -1.5))
+```
+
+You can see here that Giannis was playing over 35 minutes a game near the end of 2010's. This curtailed as he bloomed into a full time star, likely as the result of minutes limiting injuries as well as more of a focus on maintaining his body instead of feeling compelled to prove himself.
+
+Now that we have an idea of how much his playing time has changed, let's look at the stats that earned him all those minutes in the first place. Giannis has become a volume scorer in the last 5 years, which has a lot to do with his improved strength allowing him to get to the hoop whenever he wants. 
+
+```{r giannis-stat-growth}
+giannis_growth %>%
+  
+  # Change the names so they look better in the legend
+  rename(
+    "Points" = pts,
+    "Rebounds" = trb,
+    "Assists" = ast
+  ) %>%
+  
+  # Pivot so we can use the different stats as colors
+  pivot_longer(c(Points, Rebounds, Assists), names_to = "Stat", values_to = "outcome") %>%
+  
+  # Factor so Legend appears in the same order as the lines
+  mutate(Stat = factor(Stat,
+                       levels = c("Points", "Rebounds", "Assists"))) %>% 
+  
+  # Plot changes in key stats over time
+  ggplot() +
+  geom_line(aes(x = year, y = outcome, color = Stat), size = 0.8) +
+  labs(
+    x = "Year",
+    y = "Count",
+    title = "Giannis' Stat Growth",
+    color = "Stat:"
+  ) +
+  theme(
+    legend.position = "right",
+    title = element_text(size = 13, vjust = 2),
+    axis.title.y = element_text(vjust = 2.5),
+    axis.title.x = element_text(vjust = -1.5),
+    legend.title = element_text(size = 14, vjust = -0.5)
+  )
+```
+
+Giannis has become a more and more productive player over the years, consistently raising his stats in key areas. 
+
+## Conclusion
+
+Giannis has finally led the Bucks to a championship. It might have seemed like an impossibility back in 2014, but through hard work and consistent growth, as well as a contribution from teammates, coaching staff and the front office that can't be ignored. Congrats to the city of Milwaukee, the Bucks and all their fans!
